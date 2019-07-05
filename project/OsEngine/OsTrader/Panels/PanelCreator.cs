@@ -28,7 +28,7 @@ namespace OsEngine.OsTrader.Panels
             List<string> result = new List<string>();
             result.Add("bot1");
             result.Add("HammerBot");
-
+            
             // публичные примеры
 
             result.Add("Engine");
@@ -2690,7 +2690,7 @@ namespace OsEngine.OsTrader.Panels
     }
 
     /// <summary>
-    /// При закрытии свечи вне канала PriceChannel входим в позицию , стоп-лосс за экстремум прошлойсвечи от свечи входа, тейкпрофит на величину канала от закрытия свечи на которой произошел вход
+    /// При закрытии свечи вне канала PriceChannel входим в позицию , стоп-лосс за экстремум прошлойсвечи от свечи входа, тейкпрофит на величину канала от закрытия свечи на которой произошел вход. скрин OsEngine\project\OsEngine\OsTrader\Panels\robot_radchenko_price_channel.jpg
     /// </summary>
     public class PriceChannelBreak : BotPanel
     {
@@ -2703,17 +2703,21 @@ namespace OsEngine.OsTrader.Panels
             TabCreate(BotTabType.Simple);
             _tab = TabsSimple[0];
 
+            // берем индикатор PriceChannel
             _pc = new PriceChannel(name + "PriceChannel", false) { LenghtUpLine = 12, LenghtDownLine = 12, ColorUp = Color.DodgerBlue, ColorDown = Color.DarkRed };
+            // отобразили этот индикатор в основной панели
             _pc = (PriceChannel)_tab.CreateCandleIndicator(_pc, "Prime");
+            
+            // сохраняем индикатор
             _pc.Save();
 
             _tab.CandleFinishedEvent += Strateg_CandleFinishedEvent;
             _tab.PositionOpeningSuccesEvent += Strateg_PositionOpen;
 
-            Slipage = 10;
-            VolumeFix = 1;
+            Slipage = 10; // проскальзывание
+            VolumeFix = 1; // количество лотов для торговли
 
-            Load();
+            Load(); // загрузка индикатора
 
             DeleteEvent += Strategy_DeleteEvent;
 
@@ -2743,7 +2747,7 @@ namespace OsEngine.OsTrader.Panels
         //индикаторы
 
         /// <summary>
-        /// PriceChannel
+        /// PriceChannel индикатор
         /// </summary>
         private PriceChannel _pc;
 
@@ -2825,8 +2829,8 @@ namespace OsEngine.OsTrader.Panels
         // переменные, нужные для торговли
 
         private decimal _lastPrice;
-        private decimal _lastPcUp;
-        private decimal _lastPcDown;
+        private decimal _pcLastUp;
+        private decimal _pcLastDown;
 
         // логика
 
@@ -2847,8 +2851,8 @@ namespace OsEngine.OsTrader.Panels
             }
 
             _lastPrice = candles[candles.Count - 1].Close;
-            _lastPcUp = _pc.ValuesUp[_pc.ValuesUp.Count - 2];
-            _lastPcDown = _pc.ValuesDown[_pc.ValuesDown.Count - 2];
+            _pcLastUp = _pc.ValuesUp[_pc.ValuesUp.Count - 2]; // смотрим не текущее значение а прошлое, поэтому -2
+            _pcLastDown = _pc.ValuesDown[_pc.ValuesDown.Count - 2]; // смотрим не текущее значение а прошлое, поэтому -2
 
             if (_pc.ValuesUp == null || _pc.ValuesDown == null || _pc.ValuesUp.Count < _pc.LenghtUpLine + 2 || _pc.ValuesDown.Count < _pc.LenghtDownLine + 2)
             {
@@ -2880,7 +2884,7 @@ namespace OsEngine.OsTrader.Panels
                 // открытие long
                 if (Regime != BotTradeRegime.OnlyShort)
                 {
-                    if (_lastPrice > _lastPcUp)
+                    if (_lastPrice > _pcLastUp)
                     {
                         _tab.BuyAtLimit(VolumeFix, _lastPrice + Slipage);
                     }
@@ -2889,7 +2893,7 @@ namespace OsEngine.OsTrader.Panels
                 // открытие Short
                 if (Regime != BotTradeRegime.OnlyLong)
                 {
-                    if (_lastPrice < _lastPcDown)
+                    if (_lastPrice < _pcLastDown)
                     {
                         _tab.SellAtLimit(VolumeFix, _lastPrice - Slipage);
                     }
@@ -2907,15 +2911,15 @@ namespace OsEngine.OsTrader.Panels
             {
                 if (openPositions[i].Direction == Side.Buy)
                 {
-                    decimal lowCandle = _tab.CandlesAll[_tab.CandlesAll.Count - 2].Low;
+                    decimal lowCandle = _tab.CandlesAll[_tab.CandlesAll.Count - 2].Low; // экстремум Low предыдущй свечи
                     _tab.CloseAtStop(openPositions[i], lowCandle, lowCandle - Slipage);
-                    _tab.CloseAtProfit(openPositions[i], _lastPrice + (_lastPcUp - _lastPcDown), (_lastPrice + (_lastPcUp - _lastPcDown)) - Slipage);
+                    _tab.CloseAtProfit(openPositions[i], _lastPrice + (_pcLastUp - _pcLastDown), (_lastPrice + (_pcLastUp - _pcLastDown)) - Slipage);
                 }
                 else
                 {
-                    decimal highCandle = _tab.CandlesAll[_tab.CandlesAll.Count - 2].High;
+                    decimal highCandle = _tab.CandlesAll[_tab.CandlesAll.Count - 2].High; // экстремум High предыдущй свечи
                     _tab.CloseAtStop(openPositions[i], highCandle, highCandle + Slipage);
-                    _tab.CloseAtProfit(openPositions[i], _lastPrice - (_lastPcUp - _lastPcDown), (_lastPrice - (_lastPcUp - _lastPcDown)) + Slipage);
+                    _tab.CloseAtProfit(openPositions[i], _lastPrice - (_pcLastUp - _pcLastDown), (_lastPrice - (_pcLastUp - _pcLastDown)) + Slipage);
                 }
 
             }
