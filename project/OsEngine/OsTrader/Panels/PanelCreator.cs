@@ -26,9 +26,11 @@ namespace OsEngine.OsTrader.Panels
         public static List<string> GetNamesStrategy()
         {
             List<string> result = new List<string>();
+            result.Add("bot1");
+            result.Add("HammerBot");
 
             // публичные примеры
-           
+
             result.Add("Engine");
             result.Add("PatternTrader");
             result.Add("HighFrequencyTrader");
@@ -77,6 +79,18 @@ namespace OsEngine.OsTrader.Panels
         {
 
             BotPanel bot = null;
+
+            if (nameClass == "bot1")
+            {
+                bot = new bot1(name, startProgram);
+            }
+
+            if (nameClass == "HammerBot")
+            {
+                bot = new RobotHammer(name, startProgram);
+            }
+
+
             // примеры и бесплатные боты
 
             if (nameClass == "PatternTrader")
@@ -229,6 +243,91 @@ namespace OsEngine.OsTrader.Panels
             
 
             return bot;
+        }
+    }
+
+    public class RobotHammer:BotPanel
+    {
+        public RobotHammer(string name, StartProgram startProgram) : base(name, startProgram)
+        {
+            TabCreate(BotTabType.Simple);
+            TabsSimple[0].CandleFinishedEvent += RobotHammer_CandleFinishedEvent;
+            TabsSimple[0].PositionOpeningSuccesEvent += RobotHammer_PositionOpeningSuccesEvent;
+        }
+
+        private void RobotHammer_PositionOpeningSuccesEvent(Position position)
+        {
+            // всякая открытая позиция будет прикрыта стопом
+            TabsSimple[0].CloseAtStop(position,_stopPrice,_stopPrice);
+        }
+
+        private void RobotHammer_CandleFinishedEvent(List<Candle> candles)
+        {
+            // логика закрытия позиции по времени
+            if (TabsSimple[0].PositionsOpenAll != null && 
+                TabsSimple[0].PositionsOpenAll.Count !=0)
+            {
+                if (candles[candles.Count-1].TimeStart>= _timeToClose) // если наступил стоп по времени
+                {
+                    TabsSimple[0].CloseAllAtMarket();
+                }
+                return; // если есть открытые позы то новую брать не надо
+            }
+
+            // фильтр если свечей меньше 21
+            if (candles.Count<21) 
+                return;
+
+            // фильтр если последня свеча не растущая
+            if (candles[candles.Count-1].Close<=candles[candles.Count-1].Open) 
+                return;
+
+            // фильтр чтобюы последний low был самой нижней точкой за последнии 20 свечей
+            decimal lastLow = candles[candles.Count - 1].Low;
+            for (int i = candles.Count-1; i > candles.Count-20; i--)
+            {
+                if (lastLow > candles[i].Low)
+                    return;
+            }
+
+            // фильтр чтоб тело было в три раза меньше нижней тени и не больше верхней тени
+            Candle candle = candles[candles.Count - 1]; // последняя свеча из массива
+
+            decimal body = candle.Close - candle.Close;
+
+            decimal shadowLow = candle.Open - candle.Low;
+
+            decimal shadowHigh = candle.High- candle.Close;
+
+            if (body < shadowHigh)
+            {
+                return;
+            }
+
+            if (shadowLow/3 < body)
+            {
+                return;
+            }
+
+            // все фильтры пройдены. можно открывать позицию
+            TabsSimple[0].BuyAtMarket(1);
+            
+            // инициализируем переменные для закрытия
+            _timeToClose = candle.TimeStart.AddMinutes(5);
+            _stopPrice = candle.Low - TabsSimple[0].Securiti.PriceStep; // стоп на 1 пункт ниже low опорной свечи
+        }
+
+        public DateTime _timeToClose;
+        public decimal _stopPrice;
+
+        public override string GetNameStrategyType()
+        {
+            return "HammerBot";
+        }
+
+        public override void ShowIndividualSettingsDialog()
+        {
+            // gjrf yt yflj
         }
     }
 
