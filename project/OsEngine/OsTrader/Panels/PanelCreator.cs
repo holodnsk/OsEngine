@@ -26,9 +26,8 @@ namespace OsEngine.OsTrader.Panels
         public static List<string> GetNamesStrategy()
         {
             List<string> result = new List<string>();
-            result.Add("bot1");
-            result.Add("HammerBot");
-            result.Add("ThreeZoldatensRobot");
+            
+            result.Add("NewRobot2");
 
             // публичные примеры
 
@@ -80,22 +79,11 @@ namespace OsEngine.OsTrader.Panels
         {
 
             BotPanel bot = null;
-
-            if (nameClass == "bot1")
-            {
-                bot = new bot1(name, startProgram);
-            }
-
-            if (nameClass == "HammerBot")
-            {
-                bot = new RobotHammer(name, startProgram);
-            }
-
-            if (nameClass == "ThreeZoldatensRobot")
-            {
-                bot = new ThreeZoldatensRobot(name, startProgram);
-            }
             
+            if (nameClass == "NewRobot2")
+            {
+                bot = new NewRobot2(name, startProgram);
+            }
 
             // примеры и бесплатные боты
 
@@ -249,6 +237,136 @@ namespace OsEngine.OsTrader.Panels
             
 
             return bot;
+        }
+    }
+
+    public class NewRobot2:BotPanel
+    {
+        public BotTabSimple _tabOne;
+        public BotTabSimple _tabTwo;
+        public NewRobot2(string name, StartProgram startProgram) : base(name, startProgram)
+        {
+            TabCreate(BotTabType.Simple);
+            TabCreate(BotTabType.Simple); // создали две вкладки в этот массив 'TabsSimple[]'
+
+            // инициализировали поля класса для удобства обращения
+            _tabOne = TabsSimple[0]; 
+            _tabTwo = TabsSimple[1];
+
+            // подписались на события окончания свечей в обеих вкладках
+            _tabOne.CandleFinishedEvent += _tabOne_CandleFinishedEvent;
+            _tabTwo.CandleFinishedEvent += _tabTwo_CandleFinishedEvent;
+
+        }
+
+        private void _tabTwo_CandleFinishedEvent(List<Candle> candles)
+        {
+            // просто любой алгоритм
+            if (_tabTwo.PositionsOpenAll!= null && _tabTwo.PositionsOpenAll.Count != 0)
+            {
+                Position pos1 = _tabTwo.BuyAtAceberg(2,candles[candles.Count-1].Close,2);
+            }
+            else
+            {
+                _tabTwo.CloseAllAtMarket();
+            }
+        }
+
+        private void _tabOne_CandleFinishedEvent(List<Candle> candles)
+        {
+            // просто любой алгоритм
+            if (_tabOne.PositionsOpenAll != null && _tabOne.PositionsOpenAll.Count != 0)
+            {
+                _tabOne.BuyAtMarket(1);
+            }
+            else
+            {
+                _tabOne.CloseAllAtMarket();
+            }
+        }
+
+        public override string GetNameStrategyType()
+        {
+            return "NewRobot2";
+        }
+
+        public override void ShowIndividualSettingsDialog()
+        {
+            
+        }
+    }
+
+    class ThreeZoldatensRobot : BotPanel
+    {
+        // Вход в лонг:
+        // Три подряд зеленые свичи и Close последней свечи выше 20 последних свечек
+        // Выход:
+        // Три подряд красные свечи
+
+        private BotTabSimple _tab;
+        public ThreeZoldatensRobot(string name, StartProgram startProgram) : base(name, startProgram)
+        {
+            TabCreate(BotTabType.Simple);
+            _tab = TabsSimple[0];
+            _tab.CandleFinishedEvent += Strateg_CandleFinishedEvent;
+            _tab.PositionOpeningSuccesEvent += Strategy_PositionOpeningSuccesEvent;
+
+        }
+
+        private void Strategy_PositionOpeningSuccesEvent(Position position)
+        {
+            TabsSimple[0].CloseAtStop(position, _stopPrice, _stopPrice);
+        }
+
+        private void Strateg_CandleFinishedEvent(List<Candle> candles)
+        {
+
+            // если есть открытая позиция
+            if (TabsSimple[0].PositionsOpenAll != null && TabsSimple[0].PositionsOpenAll.Count != 0)
+            {
+                // если три последние свечи были падающие
+                for (int i = candles.Count - 1; i > candles.Count - 3; i--)
+                {
+                    if (candles[i].Open < candles[i].Close) //если расчетная свеча растущая
+                        return;
+                }
+                TabsSimple[0].CloseAllAtMarket(); // 
+            }
+
+            // фильтр если свечей меньше 20
+            if (candles.Count < 20)
+                return;
+
+            // фильтр чтоб три последние свечи были растущие
+            for (int i = candles.Count - 1; i > candles.Count - 3; i--)
+            {
+                if (candles[i].Open > candles[i].Close) //если расчетная свеча падающая
+                    return;
+            }
+
+            // фильтр чтоб Close последней свечи выше 20 последних свечек
+            Decimal lastClose = candles[candles.Count - 1].Close;
+            for (int i = candles.Count - 1; i > candles.Count - 20; i--)
+            {
+                if (lastClose < candles[i].High)
+                    return;
+            }
+
+            TabsSimple[0].BuyAtMarket(1);
+            _stopPrice = candles[candles.Count - 1].Low - TabsSimple[0].Securiti.PriceStep;
+
+        }
+
+        public decimal _stopPrice;
+
+        public override string GetNameStrategyType()
+        {
+            return "ThreeZoldatensRobot";
+        }
+
+        public override void ShowIndividualSettingsDialog()
+        {
+
         }
     }
 
