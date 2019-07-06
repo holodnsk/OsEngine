@@ -634,6 +634,7 @@
     <Compile Include="Entity\StrategyParemetrsUi.xaml.cs">
       <DependentUpon>StrategyParemetrsUi.xaml</DependentUpon>
     </Compile>
+    <Compile Include="OsTrader\Panels\ThreeZoldatensRobot.cs" />
     <Compile Include="OsTrader\RiskManager\RiskManagerUi.xaml.cs">
       <DependentUpon>RiskManagerUi.xaml</DependentUpon>
     </Compile>

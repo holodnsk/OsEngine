@@ -28,7 +28,8 @@ namespace OsEngine.OsTrader.Panels
             List<string> result = new List<string>();
             result.Add("bot1");
             result.Add("HammerBot");
-            
+            result.Add("ThreeZoldatensRobot");
+
             // публичные примеры
 
             result.Add("Engine");
@@ -90,6 +91,11 @@ namespace OsEngine.OsTrader.Panels
                 bot = new RobotHammer(name, startProgram);
             }
 
+            if (nameClass == "ThreeZoldatensRobot")
+            {
+                bot = new ThreeZoldatensRobot(name, startProgram);
+            }
+            
 
             // примеры и бесплатные боты
 
