@@ -8,6 +8,7 @@ using System.Drawing;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading;
+using System.Windows.Forms.VisualStyles;
 using OsEngine.Charts.CandleChart.Elements;
 using OsEngine.Charts.CandleChart.Indicators;
 using OsEngine.Entity;
@@ -26,8 +27,8 @@ namespace OsEngine.OsTrader.Panels
         public static List<string> GetNamesStrategy()
         {
             List<string> result = new List<string>();
-            
-            result.Add("NewRobot2");
+
+            result.Add("NewRobot3");
 
             // публичные примеры
 
@@ -79,10 +80,10 @@ namespace OsEngine.OsTrader.Panels
         {
 
             BotPanel bot = null;
-            
-            if (nameClass == "NewRobot2")
+
+            if (nameClass == "NewRobot3")
             {
-                bot = new NewRobot2(name, startProgram);
+                bot = new NewRobot3(name, startProgram);
             }
 
             // примеры и бесплатные боты
@@ -237,6 +238,93 @@ namespace OsEngine.OsTrader.Panels
             
 
             return bot;
+        }
+    }
+
+    public class NewRobot3:BotPanel
+    {
+        public NewRobot3(string name, StartProgram startProgram) : base(name, startProgram)
+        {
+            TabCreate(BotTabType.Simple);
+            TabsSimple[0].CandleFinishedEvent += NewRobot3_CandleFinishedEvent;
+            TabsSimple[0].PositionOpeningSuccesEvent += NewRobot3_PositionOpeningSuccesEvent;
+        }
+
+        private void NewRobot3_PositionOpeningSuccesEvent(Position position)
+        {
+            if (position.SignalTypeOpen == "PatternOne")
+            {// стоп для входа1
+                // стоп-лосс когда цена дойдет на 100 шагов от цены покупки вниз, выставим ордер на 110 шагов от цены покупки вниз
+                TabsSimple[0].CloseAtStop(position,position.EntryPrice-TabsSimple[0].Securiti.PriceStep*100, position.EntryPrice - TabsSimple[0].Securiti.PriceStep * 110);
+                // профит когда цена дойдет на 50 шагов от цены покупки вверхз, выставим ордер на 40 шагов от цены покупки верх
+                TabsSimple[0].CloseAtProfit(position,position.EntryPrice+TabsSimple[0].Securiti.PriceStep*50, position.EntryPrice + TabsSimple[0].Securiti.PriceStep * 40);
+            }
+
+            if (position.SignalTypeOpen == "PatternTwo")
+            {// стоп для довхода2
+                // стоп-лосс когда цена дойдет на 200 шагов от цены покупки вниз, выставим ордер на 210 шагов от цены покупки вниз
+                TabsSimple[0].CloseAtStop(position, position.EntryPrice - TabsSimple[0].Securiti.PriceStep * 200, position.EntryPrice - TabsSimple[0].Securiti.PriceStep * 210);
+                // профит когда цена дойдет на 150 шагов от цены покупки вверхз, выставим ордер на 140 шагов от цены покупки верх
+                TabsSimple[0].CloseAtProfit(position, position.EntryPrice + TabsSimple[0].Securiti.PriceStep * 150, position.EntryPrice + TabsSimple[0].Securiti.PriceStep * 140);
+
+            }
+        }
+
+        private void NewRobot3_CandleFinishedEvent(List<Candle> candles)
+        {
+            // вход1: две подряд растущие. довход2: две подряд падающие и следом одна растущая
+            //все по лимитам с проскальзыванием 2 пункта
+
+            if (candles.Count<5)
+                return;
+
+            List<Position> openPositions = TabsSimple[0].PositionsOpenAll;
+            if (openPositions==null || openPositions.Count==0)
+            {
+                // логика входа1
+                MethodToFindPatternOne(candles);
+            }
+            else if (openPositions.Count == 1)
+            {
+                /// логика довхода2
+                MethodToFindPatternTwo(candles);
+            }
+
+        }
+
+        private void MethodToFindPatternOne(List<Candle> candles)
+        {//вход1: две подряд растущие.
+            Candle candle1 = candles[candles.Count - 1];// последняя сформированная  свеча
+            Candle candle2 = candles[candles.Count - 2];// предпоследняя сформированная свеча
+            if (candle1.Close > candle1.Open && 
+                candle2.Close > candle2.Open)
+            {
+                TabsSimple[0].BuyAtLimit(1,candle1.Close+TabsSimple[0].Securiti.PriceStep*2/*+проскальзывание*/,"PatternOne");
+            }
+        }
+
+        private void MethodToFindPatternTwo(List<Candle> candles)
+        {// довход2: две подряд падающие и следом одна растущая
+            Candle candle1 = candles[candles.Count - 1];// последняя сформированная  свеча
+            Candle candle2 = candles[candles.Count - 2];// предпоследняя сформированная свеча
+            Candle candle3 = candles[candles.Count - 3];// предпредпоследняя сформированная свеча
+
+            if (candle1.Close > candle1.Open && 
+                candle2.Close < candle2.Open && 
+                candle3.Close < candle3.Open)
+            {
+                TabsSimple[0].BuyAtLimit(1, candle1.Close + TabsSimple[0].Securiti.PriceStep * 2/*+проскальзывание*/, "PatternTwo");
+            }
+        }
+
+        public override string GetNameStrategyType()
+        {
+            return "NewRobot3";
+        }
+
+        public override void ShowIndividualSettingsDialog()
+        {
+            
         }
     }
 
