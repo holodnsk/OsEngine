@@ -28,6 +28,7 @@ namespace OsEngine.OsTrader
 
     /// <summary>
     /// класс менеджер управления для роботов
+    /// в этот класс передаются контролы из окон RobotUI и TesterUi, вся логика здесь
     /// </summary>
     public class OsTraderMaster
     {
