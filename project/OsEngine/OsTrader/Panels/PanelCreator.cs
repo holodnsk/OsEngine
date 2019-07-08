@@ -28,7 +28,7 @@ namespace OsEngine.OsTrader.Panels
         {
             List<string> result = new List<string>();
 
-            result.Add("NewRobot3");
+            result.Add("NewRobot4");
 
             // публичные примеры
 
@@ -81,9 +81,9 @@ namespace OsEngine.OsTrader.Panels
 
             BotPanel bot = null;
 
-            if (nameClass == "NewRobot3")
+            if (nameClass == "NewRobot4")
             {
-                bot = new NewRobot3(name, startProgram);
+                bot = new NewRobot4(name, startProgram);
             }
 
             // примеры и бесплатные боты
@@ -238,6 +238,95 @@ namespace OsEngine.OsTrader.Panels
             
 
             return bot;
+        }
+    }
+
+    public class NewRobot4:BotPanel
+    {
+        public NewRobot4(string name, StartProgram startProgram) : base(name, startProgram)
+        {
+            TabCreate(BotTabType.Simple);
+            TabCreate(BotTabType.Simple);
+
+            TabsSimple[0].CandleFinishedEvent += NewRobot4Tab1_CandleFinishedEvent;
+            TabsSimple[1].CandleFinishedEvent += NewRobot4Tab2_CandleFinishedEvent;
+
+            TabsSimple[0].PositionOpeningSuccesEvent += Tab1_PositionOpeningSuccesEvent;
+            TabsSimple[1].PositionOpeningSuccesEvent += Tab2_PositionOpeningSuccesEvent;
+        }
+
+        private void Tab2_PositionOpeningSuccesEvent(Position position)
+        {
+            TabsSimple[1].CloseAtStop(position,position.EntryPrice - TabsSimple[1].Securiti.PriceStep*50, position.EntryPrice - TabsSimple[1].Securiti.PriceStep * 50);
+            TabsSimple[1].CloseAtProfit(position, position.EntryPrice + TabsSimple[1].Securiti.PriceStep * 50, position.EntryPrice + TabsSimple[1].Securiti.PriceStep * 50);
+        }
+
+        private void Tab1_PositionOpeningSuccesEvent(Position position)
+        {
+            TabsSimple[0].CloseAtStop(position,position.EntryPrice+TabsSimple[0].Securiti.PriceStep*50, position.EntryPrice + TabsSimple[0].Securiti.PriceStep * 50);
+            TabsSimple[0].CloseAtProfit(position, position.EntryPrice - TabsSimple[0].Securiti.PriceStep * 50, position.EntryPrice - TabsSimple[0].Securiti.PriceStep * 50);
+        }
+
+        private void NewRobot4Tab1_CandleFinishedEvent(List<Candle> candles)
+        {
+            // проверка синхронизации свечей, без нее не следует делать арбитражные алгоритмы,
+            // такая же проверка на этом событии второй вкладки,
+            // поэтому торговая логика будет вызвана только тогда когда свечи окажутся синхронизированны
+            List<Candle> candles2 = TabsSimple[1].CandlesFinishedOnly;
+            if (candles[candles.Count-1].TimeStart == candles2[candles2.Count-1].TimeStart)
+            {
+                TradeLogic(candles,candles2);
+            }
+        }
+
+        private void NewRobot4Tab2_CandleFinishedEvent(List<Candle> candles2)
+        {
+            
+            // проверка синхронизации свечей, без нее не следует делать арбитражные алгоритмы,
+            // такая же проверка на этом событии второй вкладки,
+            // поэтому торговая логика будет вызвана только тогда когда свечи окажутся синхронизированны
+            List<Candle> candles1 = TabsSimple[0].CandlesFinishedOnly;
+            if (candles2[candles2.Count - 1].TimeStart == candles1[candles1.Count - 1].TimeStart)
+            {
+                TradeLogic(candles1, candles2);
+            }
+        }
+
+        public void TradeLogic(List<Candle> candlesOneTab, List<Candle> candlesTwoTab)
+        {
+            // Если у первой вкладки три растущих свечи,а во второй три падающих
+            // то на первой вкладке входим в ширт, а во второй вкладке в лонг
+
+            Candle candleTab1 = candlesOneTab[candlesOneTab.Count - 1];
+            Candle candleTab2 = candlesOneTab[candlesOneTab.Count - 2];
+            Candle candleTab3 = candlesOneTab[candlesOneTab.Count - 3];
+
+            Candle candleTab21 = candlesTwoTab[candlesTwoTab.Count - 1];
+            Candle candleTab22 = candlesTwoTab[candlesTwoTab.Count - 2];
+            Candle candleTab23 = candlesTwoTab[candlesTwoTab.Count - 3];
+
+            if (candleTab1.Close > candleTab1.Open &&
+                candleTab2.Close > candleTab2.Open &&
+                candleTab3.Close > candleTab3.Open &&
+                candleTab21.Close < candleTab21.Open &&
+                candleTab22.Close < candleTab22.Open &&
+                candleTab23.Close < candleTab23.Open)
+            {
+                TabsSimple[0].SellAtMarket(1);
+                TabsSimple[1].BuyAtMarket(1);
+            }
+
+        }
+
+
+        public override string GetNameStrategyType()
+        {
+            return "NewRobot4";
+        }
+
+        public override void ShowIndividualSettingsDialog()
+        {
+            
         }
     }
 
