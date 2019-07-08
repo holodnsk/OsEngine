@@ -28,7 +28,7 @@ namespace OsEngine.OsTrader.Panels
         {
             List<string> result = new List<string>();
 
-            result.Add("NewRobot4");
+            result.Add("HammerArbitrager");
 
             // публичные примеры
 
@@ -81,7 +81,7 @@ namespace OsEngine.OsTrader.Panels
 
             BotPanel bot = null;
 
-            if (nameClass == "NewRobot4")
+            if (nameClass == "HammerArbitrager")
             {
                 bot = new NewRobot4(name, startProgram);
             }
@@ -238,6 +238,153 @@ namespace OsEngine.OsTrader.Panels
             
 
             return bot;
+        }
+    }
+
+
+    // домашнее задание блока 4
+    // робот на двух вкладках на два инструмента
+    // Вход:
+    // на одном инструменте молот направленный длинной тенью вниз,
+    // на втором инструменте молот направленный длинной тенью вверх
+    // на первом инструменте входим в лонг
+    // на втором инструмент входим в шорт
+    // использовать лимитные ордера
+    // Выход:
+    // через n свечей
+
+    public class HammerArbitrager : BotPanel
+    {
+        public HammerArbitrager(string name, StartProgram startProgram) : base(name, startProgram)
+        {
+            TabCreate(BotTabType.Simple);
+            TabCreate(BotTabType.Simple);
+
+            TabsSimple[0].CandleFinishedEvent += Tab1_CandleFinishedEvent;
+            TabsSimple[1].CandleFinishedEvent += Tab2_CandleFinishedEvent;
+
+            TabsSimple[0].PositionOpeningSuccesEvent += Tab1_PositionOpeningSuccesEvent;
+            TabsSimple[1].PositionOpeningSuccesEvent += Tab2_PositionOpeningSuccesEvent;
+
+        }
+
+        private void Tab1_PositionOpeningSuccesEvent(Position position)
+        {
+            TabsSimple[0].CloseAtStop(position, _stopPriceTab1, _stopPriceTab1);
+        }
+
+        private void Tab2_PositionOpeningSuccesEvent(Position position)
+        {
+            TabsSimple[1].CloseAtStop(position, _stopPriceTab2, _stopPriceTab2);
+
+        }
+        private void Tab1_CandleFinishedEvent(List<Candle> candles1)
+        {
+            // проверка синхронизации свечей, без нее не следует делать арбитражные алгоритмы,
+            // такая же проверка на этом событии второй вкладки,
+            // поэтому торговая логика будет вызвана только тогда когда свечи окажутся синхронизированны
+            List<Candle> candles2 = TabsSimple[1].CandlesFinishedOnly;
+            if (candles1[candles1.Count - 1].TimeStart == candles2[candles2.Count - 1].TimeStart)
+            {
+                TradeLogic(candles1, candles2);
+            }
+
+        }
+
+        private void Tab2_CandleFinishedEvent(List<Candle> candles2)
+        {
+            // проверка синхронизации свечей, без нее не следует делать арбитражные алгоритмы,
+            // такая же проверка на этом событии второй вкладки,
+            // поэтому торговая логика будет вызвана только тогда когда свечи окажутся синхронизированны
+            List<Candle> candles1 = TabsSimple[0].CandlesFinishedOnly;
+            if (candles1[candles1.Count - 1].TimeStart == candles2[candles2.Count - 1].TimeStart)
+            {
+                TradeLogic(candles1, candles2);
+            }
+        }
+
+        private void TradeLogic(List<Candle> candles1, List<Candle> candles2)
+        {
+            // логика закрытия позиции по времени
+            if ((TabsSimple[0].PositionsOpenAll != null &&
+                TabsSimple[0].PositionsOpenAll.Count != 0) ||
+                (TabsSimple[1].PositionsOpenAll != null &&
+                TabsSimple[1].PositionsOpenAll.Count != 0))
+            {
+                if (candles1[candles1.Count - 1].TimeStart >= _timeToClose ||
+                    candles2[candles2.Count - 1].TimeStart >= _timeToClose) // если наступил стоп по времени
+                {
+                    TabsSimple[0].CloseAllAtMarket();
+                    TabsSimple[1].CloseAllAtMarket();
+                }
+                return; // если есть открытые позы то новую брать не надо
+            }
+
+            // фильтр: набралось уже больше 20 счечей, иначе не будет входа
+            if (candles1.Count < 21 || candles2.Count < 21)
+                return;
+
+            // фильтр: чтобы последний low был самой нижней точкой за последнии 20 свечей, иначе не будет входа
+            decimal lastLowTab1 = candles1[candles1.Count - 1].Low;
+            decimal lastHighTab2 = candles2[candles2.Count - 1].High; // // а эту проверяем чтоб была самая верхяя точка
+            for (int i = candles1.Count - 1; i > candles1.Count - 20; i--)
+            {
+                if (lastLowTab1 > candles1[i].Low ||
+                    lastHighTab2 < candles2[i].High) 
+                    return;
+            }
+
+            // фильтр: чтоб последня свеча была растущая, иначе не будет входа
+            if (candles1[candles1.Count - 1].Close <= candles1[candles1.Count - 1].Open ||
+                candles2[candles2.Count - 1].Close >= candles2[candles2.Count - 1].Open) // а это падающая
+                return;
+
+            // фильтр чтоб тело было в три раза меньше нижней тени и не больше верхней тени
+            Candle candleTab1 = candles1[candles1.Count - 1]; // последняя свеча из массива
+            Candle candleTab2 = candles2[candles1.Count - 1]; // последняя свеча из массива
+
+            decimal bodyCandleTab1 = candleTab1.Close - candleTab1.Open;
+            decimal shadowLowTab1 = candleTab1.Open - candleTab1.Low;
+            decimal shadowHighTab1 = candleTab1.High - candleTab1.Close;
+
+            decimal bodyCandleTab2 = candleTab2.Open - candleTab2.Close;
+            decimal shadowHighTab2 = candleTab2.High - candleTab2.Open;
+            decimal shadowLowTab2 = candleTab2.Close - candleTab2.Low;
+
+            if (bodyCandleTab1 < shadowHighTab1)
+                return;
+            if (bodyCandleTab2 < shadowLowTab2)
+                return;
+
+            if (shadowLowTab1 / 3 < bodyCandleTab1)
+                return;
+            if (shadowHighTab2 / 3 < bodyCandleTab2)
+                return;
+
+
+            // все фильтры пройдены. можно открывать позицию. Лимитно на 5 пунктов выше чем хай последней свечи
+            TabsSimple[0].BuyAtLimit(1, shadowHighTab1+TabsSimple[0].Securiti.PriceStep*5);
+            TabsSimple[1].SellAtLimit(1, shadowLowTab2-TabsSimple[0].Securiti.PriceStep*5); // а это лимитно на 5 пунктов ниже чем лоу последней свечи
+
+            // инициализируем переменные для закрытия
+            _timeToClose = candleTab1.TimeStart.AddMinutes(5);
+            _stopPriceTab1 = candleTab1.Low - TabsSimple[0].Securiti.PriceStep; // стоп на 1 пункт ниже low опорной свечи
+            _stopPriceTab2 = candleTab1.High - TabsSimple[1].Securiti.PriceStep; // стоп на 1 пункт выхе хай опорной свечи
+        }
+
+        public DateTime _timeToClose;
+        public decimal _stopPriceTab1;
+        public decimal _stopPriceTab2;
+        
+
+        public override string GetNameStrategyType()
+        {
+            return "HammerArbitrager";
+        }
+
+        public override void ShowIndividualSettingsDialog()
+        {
+            
         }
     }
 
