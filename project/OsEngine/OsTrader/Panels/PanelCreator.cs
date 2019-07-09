@@ -28,7 +28,7 @@ namespace OsEngine.OsTrader.Panels
         {
             List<string> result = new List<string>();
 
-            result.Add("HomeWorkRobotBearPatternWithSettings");
+            result.Add("NewRobot7");
 
             // публичные примеры
 
@@ -81,9 +81,9 @@ namespace OsEngine.OsTrader.Panels
 
             BotPanel bot = null;
 
-            if (nameClass == "HomeWorkRobotBearPatternWithSettings")
+            if (nameClass == "NewRobot7")
             {
-                bot = new HomeWorkRobotBearPatternWithSettings(name, startProgram);
+                bot = new NewRobot7(name, startProgram);
             }
 
             // примеры и бесплатные боты
@@ -240,6 +240,77 @@ namespace OsEngine.OsTrader.Panels
             return bot;
         }
     }
+
+    /// <summary>
+    /// первый прибыльный робот
+    /// использование индикаторов
+    ///  входим в лонг когда закрытие свечи выше верхнего значения конверта
+    /// выходим когда закрытие свечи ниже мувинг - атр*2
+    /// </summary>
+    public class NewRobot7 : BotPanel
+    {
+        public MovingAverage _moving;
+        public Atr _atr;
+        public Envelops _envelops;
+
+        public NewRobot7(string name, StartProgram startProgram) : base(name, startProgram)
+        {
+            TabCreate(BotTabType.Simple);
+            _moving = new MovingAverage("moving1", false);
+            _moving = (MovingAverage) TabsSimple[0].CreateCandleIndicator(_moving, "Prime"); // рисовать на основном графике
+            _atr = new Atr("atr1", false);
+            _atr = (Atr)TabsSimple[0].CreateCandleIndicator(_atr, "NewArea"); // рисовать на дополнительном графике
+            _envelops = new Envelops("envelop1", false);
+            _envelops = (Envelops)TabsSimple[0].CreateCandleIndicator(_envelops, "Prime");  // рисовать на основном графике
+
+            TabsSimple[0].CandleFinishedEvent += NewRobot7_CandleFinishedEvent;
+        }
+
+        private void NewRobot7_CandleFinishedEvent(List<Candle> candles)
+        {
+            if(_moving.Lenght > candles.Count ||
+               _atr.Lenght >candles.Count)
+                return;
+
+            if (candles[candles.Count-1].TimeStart.Hour < 11) // чтобы все гэпы и все остальное прошли мимо нас
+                return;
+
+            // входим в лонг когда закрытие свечи выше верхнего значения конверта
+            // выходим когда закрытие свечи ниже мувинг - атр*2
+            List<Position> positions = TabsSimple[0].PositionsOpenAll;
+            if (positions != null && 
+                positions.Count != 0 &&
+                positions[0].State != PositionStateType.Open)
+                    return; // если позиция уже есть но она пока не открылась
+
+            if (positions == null || positions.Count == 0)
+            {// логика открытия
+                if (candles[candles.Count-1].Close > _envelops.ValuesUp[_envelops.ValuesUp.Count-1]) // у конверта есть два массива, верхняя и нижняя граница канала
+                {// если закрытие свечи выше верхней граници канала, то покупаем
+                    TabsSimple[0].BuyAtLimit(1, candles[candles.Count - 1].Close);
+                }
+            }
+            else
+            {// логика закрытия
+                if (candles[candles.Count-1].Close < 
+                    _moving.Values[_moving.Values.Count-1] - _atr.Values[_atr.Values.Count-1]*2) 
+                { // если цена закрытия свечи меньше чем мувинг минус 2*атр, то пора закрывать
+                    TabsSimple[0].CloseAtLimit(positions[0],candles[candles.Count-1].Close,positions[0].OpenVolume);
+                }
+            }
+        }
+
+        public override string GetNameStrategyType()
+        {
+            return "NewRobot7";
+        }
+
+        public override void ShowIndividualSettingsDialog()
+        {
+            
+        }
+    }
+
     /// <summary>
     /// Домашнее задание блока "Блок 5. Богатые настройки и WPF (домашнее задание).mp4"
     /// изображение паттерна в медвежъе_поглощение_с_настройками.jpg
