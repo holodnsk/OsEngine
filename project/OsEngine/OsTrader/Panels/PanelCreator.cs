@@ -28,7 +28,7 @@ namespace OsEngine.OsTrader.Panels
         {
             List<string> result = new List<string>();
 
-            result.Add("NewRobot5");
+            result.Add("HomeWorkRobotBearPatternWithSettings");
 
             // публичные примеры
 
@@ -81,9 +81,9 @@ namespace OsEngine.OsTrader.Panels
 
             BotPanel bot = null;
 
-            if (nameClass == "NewRobot5")
+            if (nameClass == "HomeWorkRobotBearPatternWithSettings")
             {
-                bot = new NewRobot5(name, startProgram);
+                bot = new HomeWorkRobotBearPatternWithSettings(name, startProgram);
             }
 
             // примеры и бесплатные боты
@@ -240,6 +240,160 @@ namespace OsEngine.OsTrader.Panels
             return bot;
         }
     }
+    /// <summary>
+    /// Домашнее задание блока "Блок 5. Богатые настройки и WPF (домашнее задание).mp4"
+    /// изображение паттерна в медвежъе_поглощение_с_настройками.jpg
+    /// робот с настройками
+    /// 1. текущая свеча падающая
+    /// 2. предыдущая свеча растущая
+    /// 3. тело падающей свечи минимум в 3 раза больше тела растущей свечи
+    /// 4. 5 свечей назад лоу был ниже лоу последней свечи
+    ///
+    /// 1. входить будем в шорт
+    /// 2. выходить по профиту и по стопу
+    ///
+    /// Сохранять будем:
+    /// 1. величину стопа
+    /// 2. величину профита
+    /// 3. проскальзывание входа
+    /// 4. проскальзывание выхода
+    /// 5. объем для входа
+    /// 6. бот включен или выключен
+    /// </summary>
+    public class HomeWorkRobotBearPatternWithSettings:BotPanel
+    {
+        public HomeWorkRobotBearPatternWithSettings(string name, StartProgram startProgram) : base(name, startProgram)
+        {
+            Stop = 10;
+            Profit = 20;
+            SleepageOpenPosition = 2;
+            SleepageClosePosition = 2;
+            Volume = 2;
+            IsOn = true;
+
+            Load(); // загрузить настройки из файла если они там есть
+
+            TabCreate(BotTabType.Simple);
+            TabsSimple[0].CandleFinishedEvent += HomeWorkRobotBearPatternWithSettings_CandleFinishedEvent;
+            TabsSimple[0].PositionOpeningSuccesEvent += HomeWorkRobotBearPatternWithSettings_PositionOpeningSuccesEvent;
+        }
+
+        private void HomeWorkRobotBearPatternWithSettings_PositionOpeningSuccesEvent(Position position)
+        {
+            TabsSimple[0].CloseAtStop(
+                position,
+                position.EntryPrice + Stop * TabsSimple[0].Securiti.PriceStep,
+                position.EntryPrice + Stop * TabsSimple[0].Securiti.PriceStep + SleepageClosePosition * TabsSimple[0].Securiti.PriceStep
+                );
+
+            TabsSimple[0].CloseAtProfit(
+                position,
+                position.EntryPrice - Profit * TabsSimple[0].Securiti.PriceStep,
+                position.EntryPrice - Profit * TabsSimple[0].Securiti.PriceStep - SleepageClosePosition * TabsSimple[0].Securiti.PriceStep
+            );
+        }
+
+        /// <summary>
+        /// сохранить настройки
+        /// </summary>
+        public void Save()
+        {
+            try
+            {
+                using (StreamWriter writer = new StreamWriter(@"Engine\" + NameStrategyUniq + @"SettingsBot.txt", false)
+                )
+                {
+                    writer.WriteLine(Stop);
+                    writer.WriteLine(Profit);
+                    writer.WriteLine(SleepageOpenPosition);
+                    writer.WriteLine(SleepageClosePosition);
+                    writer.WriteLine(Volume);
+                    writer.WriteLine(IsOn);
+                    writer.Close();
+                }
+            }
+            catch (Exception)
+            {
+                // отправить в лог
+            }
+        }
+
+        /// <summary>
+        /// загрузить настройки
+        /// </summary>
+        private void Load()
+        {
+            if (!File.Exists(@"Engine\" + NameStrategyUniq + @"SettingsBot.txt"))
+            {
+                return;
+            }
+            try
+            {
+                using (StreamReader reader = new StreamReader(@"Engine\" + NameStrategyUniq + @"SettingsBot.txt"))
+                {
+
+                    Stop = Convert.ToInt32(reader.ReadLine());
+                    Profit = Convert.ToInt32(reader.ReadLine());
+                    SleepageOpenPosition = Convert.ToInt32(reader.ReadLine());
+                    SleepageClosePosition = Convert.ToInt32(reader.ReadLine());
+                    Volume = Convert.ToInt32(reader.ReadLine());
+                    IsOn = Convert.ToBoolean(reader.ReadLine());
+                    reader.Close();
+                }
+            }
+            catch (Exception)
+            {
+                // отправить в лог
+            }
+        }
+
+        private void HomeWorkRobotBearPatternWithSettings_CandleFinishedEvent(List<Candle> candles)
+        {
+            if (candles.Count > 5) // свечей для работы алгоритма мало, заходить не надо
+                return;
+            if (IsOn == false) // робот выключен, заходить не надо
+                return;
+            if (TabsSimple[0].PositionsOpenAll != null &&
+                TabsSimple[0].PositionsOpenAll.Count > 0) // уже есть поза, снова заходить не надо
+                return;
+
+            // 1. текущая свеча падающая
+            // 2. предыдущая свеча растущая
+            // 3. тело падающей свечи минимум в 3 раза больше тела растущей свечи
+            // 4. 5 свечей назад лоу был ниже лоу последней свечи
+            Candle lastCandle = candles[candles.Count - 1];
+            Candle secondlastCandle = candles[candles.Count - 2];
+
+            if (lastCandle.Close < lastCandle.Open &&                                                  // текущая свеча падающая
+                secondlastCandle.Close > lastCandle.Open                                               // предыдущая свеча растущая
+                &&
+                lastCandle.Open - lastCandle.Close> 3 * (secondlastCandle.Close- secondlastCandle.Open)  // тело падаюзей свечи минимум в 3 раза больше тела растущей свечи
+                &&
+                candles[candles.Count - 5].Low < lastCandle.Low)                                       // 5 свечей назад лоу был ниже лоу последней свечи
+            {
+                TabsSimple[0].BuyAtLimit(Volume, lastCandle.Close + SleepageOpenPosition * TabsSimple[0].Securiti.PriceStep);
+            }
+
+        }
+
+        public int Stop;
+        public int Profit;
+        public int SleepageOpenPosition;
+        public int SleepageClosePosition;
+        public int Volume;
+        public bool IsOn;
+
+        public override string GetNameStrategyType()
+        {
+            return "HomeWorkRobotBearPatternWithSettings";
+        }
+
+        public override void ShowIndividualSettingsDialog()
+        {
+            HomeWorkRobotBearPatternWithSettingsUi ui = new HomeWorkRobotBearPatternWithSettingsUi(this);
+            ui.ShowDialog();
+        }
+    }
 
     /// <summary>
     /// изображение паттерна в robot_бычье_поглощение_с_настройками.jpg
@@ -264,18 +418,19 @@ namespace OsEngine.OsTrader.Panels
     {
         public NewRobot5(string name, StartProgram startProgram) : base(name, startProgram)
         {
-        Stop = 10;
-        Profit = 20;
-        Sleepage = 2;
-        Volume = 2;
-        IsOn = true;
+            Stop = 10;
+            Profit = 20;
+            Sleepage = 2;
+            Volume = 2;
+            IsOn = true;
 
-        Load(); // загрузить настройки из файла если они там есть
+            Load(); // загрузить настройки из файла если они там есть
 
-        TabCreate(BotTabType.Simple);
-        TabsSimple[0].CandleFinishedEvent += NewRobot5_CandleFinishedEvent;
-        TabsSimple[0].PositionOpeningSuccesEvent += NewRobot5_PositionOpeningSuccesEvent;
-    }
+            TabCreate(BotTabType.Simple);
+            TabsSimple[0].CandleFinishedEvent += NewRobot5_CandleFinishedEvent;
+            TabsSimple[0].PositionOpeningSuccesEvent += NewRobot5_PositionOpeningSuccesEvent;
+        }
+
 
         private void NewRobot5_PositionOpeningSuccesEvent(Position position)
         {
