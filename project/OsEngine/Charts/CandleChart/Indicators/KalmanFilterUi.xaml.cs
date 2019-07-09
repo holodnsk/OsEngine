@@ -18,7 +18,7 @@ namespace OsEngine.Charts.CandleChart.Indicators
         /// <summary>
         /// индикатор
         /// </summary>
-        private KalmanFilter _indicator;
+        private KalmanFilter _indicator; // для получения доступа к данным класса логики
 
         /// <summary>
         /// изменялись ли настройки индикатора

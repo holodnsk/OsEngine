@@ -21,8 +21,8 @@ namespace OsEngine.Charts.CandleChart.Indicators
         public KalmanFilter(string uniqName, bool canDelete)
         {
             Name = uniqName;
-            Sharpness = 1;
-            K = 1;
+            Sharpness = 1; // константу инициировать в конструкторе
+            K = 1; // константу инициировать в конструкторе
 
             TypeIndicator = IndicatorOneCandleChartType.Line;
             TypeCalculationAverage = MovingAverageTypeCalculation.Simple;
@@ -40,8 +40,8 @@ namespace OsEngine.Charts.CandleChart.Indicators
         /// <param name="canDelete">можно ли пользователю удалить индикатор с графика вручную</param>
         public KalmanFilter(bool canDelete)
         {
-            Sharpness = 1;
-            K = 1;
+            Sharpness = 1; // константу инициировать в конструкторе
+            K = 1; // константу инициировать в конструкторе
             TypeIndicator = IndicatorOneCandleChartType.Line;
             TypeCalculationAverage = MovingAverageTypeCalculation.Simple;
             ColorBase = Color.DodgerBlue;
@@ -147,8 +147,8 @@ namespace OsEngine.Charts.CandleChart.Indicators
                 using (StreamWriter writer = new StreamWriter(@"Engine\" + Name + @".txt", false))
                 {
                     writer.WriteLine(ColorBase.ToArgb());
-                    writer.WriteLine(Sharpness);
-                    writer.WriteLine(K);
+                    writer.WriteLine(Sharpness); // константу сохранить
+                    writer.WriteLine(K); // константу сохранить
                     writer.WriteLine(PaintOn);
                     writer.WriteLine(TypeCalculationAverage);
                     writer.Close();
@@ -175,8 +175,8 @@ namespace OsEngine.Charts.CandleChart.Indicators
                 using (StreamReader reader = new StreamReader(@"Engine\" + Name + @".txt"))
                 {
                     ColorBase = Color.FromArgb(Convert.ToInt32(reader.ReadLine()));
-                    Sharpness = Convert.ToDecimal(reader.ReadLine());
-                    K = Convert.ToDecimal(reader.ReadLine());
+                    Sharpness = Convert.ToDecimal(reader.ReadLine()); // константу загрузить
+                    K = Convert.ToDecimal(reader.ReadLine()); // константу загрузить
                     PaintOn = Convert.ToBoolean(reader.ReadLine());
                     Enum.TryParse(reader.ReadLine(), true, out TypeCalculationAverage);
                     reader.ReadLine();
@@ -219,7 +219,7 @@ namespace OsEngine.Charts.CandleChart.Indicators
         /// показать окно с настройками
         /// </summary>
         public void ShowDialog()
-        {
+        { // вызвать создание окна
             KalmanFilterUi ui = new KalmanFilterUi(this);
             ui.ShowDialog();
 
@@ -330,7 +330,7 @@ namespace OsEngine.Charts.CandleChart.Indicators
             Values[Values.Count - 1] = GetValue(candles, candles.Count - 1);
         }
 
-        private List<double> _velocity = new List<double>();
+    
 
         /// <summary>
         /// взять значение индикатора по индексу
@@ -339,15 +339,22 @@ namespace OsEngine.Charts.CandleChart.Indicators
         /// <param name="index">индекс</param>
         /// <returns>значение индикатора по индексу</returns>
         private decimal GetValue(List<Candle> candles, int index)
-        {
-            //Kalman[i]=Error+Velocity[i], where
-            //Error=Kalman[i-1]+Distance*ShK,
-            //Velocity[i]=Velocity[i-1]+Distance*K/100,
-            //Distance=Price[i]-Kalman[i-1],
-            //ShK=sqrt(Sharpness*K/100).
+        {// логика индикатора находится здесь, все остальное у всех индикаторов (почти)одинаковое,
+         // все что ниже метода GetValue скорее всего относится к логике индикатора
+         // если надо индикатор с двумя сериями - взять болтинжер для образца
+         // если надо индикатор с тремя сериями - взять аллигатор для образца
+         // если надо индикатор с 8ю сериями - взять любой пивот для образца
+
+            //Kalman[i]=Error+Velocity[i],
+            // where:
+            // Error=Kalman[i-1]+Distance*ShK,
+            // Velocity[i]=Velocity[i-1]+Distance*K/100,
+            // Distance=Price[i]-Kalman[i-1],
+            // ShK=sqrt(Sharpness*K/100).
+            // Sharpness  и K - константы которые вводит пользователь
 
             if (index == 0)
-            {
+            { // исключить вызов -1 элемента
                 _velocity.Add(0);
                 return 0;
             }
@@ -356,7 +363,7 @@ namespace OsEngine.Charts.CandleChart.Indicators
             double distans = Convert.ToDouble(candles[index].Close - Values[index - 1]);
 
             if (index + 1 > _velocity.Count)
-            {
+            {// добавлять ячейки чтоб их всегда было столько же сколько и размер индекса
                 _velocity.Add(0);
             }
 
@@ -366,5 +373,7 @@ namespace OsEngine.Charts.CandleChart.Indicators
 
             return Convert.ToDecimal(error + _velocity[index]);
         }
+        // переменные для расчета индикатора
+        private List<double> _velocity = new List<double>();
     }
 }

@@ -77,7 +77,7 @@ namespace OsEngine.Charts.CandleChart.Indicators
             _gridViewIndicators.Rows.Add("OnBalanceVolume");
             _gridViewIndicators.Rows.Add("Ichimoku");
             _gridViewIndicators.Rows.Add("IvashovRange");
-            _gridViewIndicators.Rows.Add("KalmanFilter");
+            _gridViewIndicators.Rows.Add("KalmanFilter"); // сюда добавить новый индикатор чтоб он стал доступен для выбора
             _gridViewIndicators.Rows.Add("Moving Average");
             _gridViewIndicators.Rows.Add("MACD Histogram");
             _gridViewIndicators.Rows.Add("MACD Line");
@@ -146,7 +146,7 @@ namespace OsEngine.Charts.CandleChart.Indicators
         void gridViewIndicators_SelectionChanged(object sender, EventArgs e)
         {
 
-            if (_gridViewIndicators.SelectedCells[0].Value.ToString() == "KalmanFilter")
+            if (_gridViewIndicators.SelectedCells[0].Value.ToString() == "KalmanFilter") // сюда добавить новый индикатор и его описаниечтоб он стал доступен для выбора
             {
                 TextBlockDescription.Text = " Эффективный рекурсивный фильтр, оценивающий вектор состояния динамической системы, используя ряд неполных и зашумленных измерений. Фильтр Калмана широко используется в инженерных и эконометрических приложениях";
             }
@@ -364,7 +364,7 @@ namespace OsEngine.Charts.CandleChart.Indicators
 
 
 
-            if (_gridViewIndicators.SelectedCells[0].Value.ToString() == "KalmanFilter")
+            if (_gridViewIndicators.SelectedCells[0].Value.ToString() == "KalmanFilter") // сюда добавить новый индикатор чтоб он стал доступен для выбора
             {
                 string name = "";
 

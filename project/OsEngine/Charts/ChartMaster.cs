@@ -71,7 +71,7 @@ namespace OsEngine.Charts
 
                         string[] indicator = readerStr.Split('@');
 
-                        if (indicator[0] == "KalmanFilter")
+                        if (indicator[0] == "KalmanFilter") // сюда добавить новый индикатор чтоб он стал доступен для выбора
                         {
                             CreateIndicator(new KalmanFilter(indicator[1], Convert.ToBoolean(indicator[3])), indicator[2]);
                         }
