@@ -553,6 +553,9 @@
     <Compile Include="OsTrader\Panels\PanelsGui\BollingerOutburstUi.xaml.cs">
       <DependentUpon>BollingerOutburstUi.xaml</DependentUpon>
     </Compile>
+    <Compile Include="OsTrader\Panels\PanelsGui\NewRobot5Ui.xaml.cs">
+      <DependentUpon>NewRobot5Ui.xaml</DependentUpon>
+    </Compile>
     <Compile Include="OsTrader\Panels\SingleRobots\StrategyBollingerUi.xaml.cs">
       <DependentUpon>StrategyBollingerUi.xaml</DependentUpon>
     </Compile>
@@ -1046,6 +1049,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="OsTrader\Panels\PanelsGui\BollingerOutburstUi.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="OsTrader\Panels\PanelsGui\NewRobot5Ui.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

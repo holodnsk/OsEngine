@@ -28,7 +28,7 @@ namespace OsEngine.OsTrader.Panels
         {
             List<string> result = new List<string>();
 
-            result.Add("HammerArbitrager");
+            result.Add("NewRobot5");
 
             // публичные примеры
 
@@ -81,9 +81,9 @@ namespace OsEngine.OsTrader.Panels
 
             BotPanel bot = null;
 
-            if (nameClass == "HammerArbitrager")
+            if (nameClass == "NewRobot5")
             {
-                bot = new NewRobot4(name, startProgram);
+                bot = new NewRobot5(name, startProgram);
             }
 
             // примеры и бесплатные боты
@@ -241,18 +241,168 @@ namespace OsEngine.OsTrader.Panels
         }
     }
 
+    /// <summary>
+    /// изображение паттерна в robot_бычье_поглощение_с_настройками.jpg
+    /// робот с найстройками
+    /// 1. текущая свеча растущая
+    /// 2. предыдущая свеча падающая
+    /// 3. тело растущей свечи минимум в 3 раза больше тела падающей свечи
+    /// 4. 5 свечей назад хай был выше хая последней свечи
+    ///
+    /// 1. входить будем в лонг
+    /// 2. выходить по профиту и по стопу
+    ///
+    /// Сохранять будем:
+    /// 1. величину стопа
+    /// 2. величину профита
+    /// 3. проскальзывание входа
+    /// 4. проскальзывание выхода
+    /// 5. объем для входа
+    /// 6. бот включен или выключен
+    /// </summary>
+    public class NewRobot5 : BotPanel
+    {
+        public NewRobot5(string name, StartProgram startProgram) : base(name, startProgram)
+        {
+        Stop = 10;
+        Profit = 20;
+        Sleepage = 2;
+        Volume = 2;
+        IsOn = true;
 
-    // домашнее задание блока 4
-    // робот на двух вкладках на два инструмента
-    // Вход:
-    // на одном инструменте молот направленный длинной тенью вниз,
-    // на втором инструменте молот направленный длинной тенью вверх
-    // на первом инструменте входим в лонг
-    // на втором инструмент входим в шорт
-    // использовать лимитные ордера
-    // Выход:
-    // через n свечей
+        Load(); // загрузить настройки из файла если они там есть
 
+        TabCreate(BotTabType.Simple);
+        TabsSimple[0].CandleFinishedEvent += NewRobot5_CandleFinishedEvent;
+        TabsSimple[0].PositionOpeningSuccesEvent += NewRobot5_PositionOpeningSuccesEvent;
+    }
+
+        private void NewRobot5_PositionOpeningSuccesEvent(Position position)
+        {
+            TabsSimple[0].CloseAtStop(
+                position,
+                position.EntryPrice - Stop*TabsSimple[0].Securiti.PriceStep, 
+                position.EntryPrice - Stop * TabsSimple[0].Securiti.PriceStep - Sleepage * TabsSimple[0].Securiti.PriceStep
+                );
+
+            TabsSimple[0].CloseAtProfit(
+                position,
+                position.EntryPrice + Profit* TabsSimple[0].Securiti.PriceStep,
+                position.EntryPrice + Profit * TabsSimple[0].Securiti.PriceStep - Sleepage * TabsSimple[0].Securiti.PriceStep
+            );
+        }
+
+        /// <summary>
+        /// сохранить настройки
+        /// </summary>
+        public void Save()
+        {
+            try
+            {
+                using (StreamWriter writer = new StreamWriter(@"Engine\" + NameStrategyUniq + @"SettingsBot.txt", false)
+                )
+                {
+                    writer.WriteLine(Stop);
+                    writer.WriteLine(Profit);
+                    writer.WriteLine(Sleepage);
+                    writer.WriteLine(Volume);
+                    writer.WriteLine(IsOn);
+                    writer.Close();
+                }
+            }
+            catch (Exception)
+            {
+                // отправить в лог
+            }
+        }
+
+        /// <summary>
+        /// загрузить настройки
+        /// </summary>
+        private void Load()
+        {
+            if (!File.Exists(@"Engine\" + NameStrategyUniq + @"SettingsBot.txt"))
+            {
+                return;
+            }
+            try
+            {
+                using (StreamReader reader = new StreamReader(@"Engine\" + NameStrategyUniq + @"SettingsBot.txt"))
+                {
+
+                    Stop = Convert.ToInt32(reader.ReadLine());
+                    Profit = Convert.ToInt32(reader.ReadLine());
+                    Sleepage = Convert.ToInt32(reader.ReadLine());
+                    Volume = Convert.ToInt32(reader.ReadLine());
+                    IsOn = Convert.ToBoolean(reader.ReadLine());
+                    reader.Close();
+                }
+            }
+            catch (Exception)
+            {
+                // отправить в лог
+            }
+        }
+
+        private void NewRobot5_CandleFinishedEvent(List<Candle> candles)
+        {
+            if (candles.Count>5) // свечей для работы алгоритма мало, заходить не надо
+                return;
+            if (IsOn == false) // робот выключен, заходить не надо
+                return;
+            if (TabsSimple[0].PositionsOpenAll != null &&
+                TabsSimple[0].PositionsOpenAll.Count >0) // уже есть поза, снова заходить не надо
+                return;
+            
+            // 1. текущая свеча растущая
+            // 2. предыдущая свеча падающая
+            // 3. тело растущей свечи минимум в 3 раза больше тела падающей свечи
+            // 4. 5 свечей назад хай был выше хая последней свечи
+            Candle lastCandle = candles[candles.Count - 1];
+            Candle secondlastCandle = candles[candles.Count - 2];
+
+            if (lastCandle.Close>lastCandle.Open &&                                                  // текущая свеча растущая
+                secondlastCandle.Close<lastCandle.Open                                               // предыдущая свеча падающая
+                && 
+                lastCandle.Close - lastCandle.Open > 3*(secondlastCandle.Open - secondlastCandle.Close)  // тело растущей свечи минимум в 3 раза больше тела падающей свечи
+                &&
+                candles[candles.Count-5].High>lastCandle.High)                                       // 5 свечей назад хай был выше хая последней свечи
+            {
+                TabsSimple[0].BuyAtLimit(Volume, lastCandle.Close + Sleepage * TabsSimple[0].Securiti.PriceStep);
+            }
+
+        }
+
+        public int Stop;
+        public int Profit;
+        public int Sleepage;
+        public int Volume;
+        public bool IsOn;
+
+        public override string GetNameStrategyType()
+        {
+            return "NewRobot5";
+        }
+
+        public override void ShowIndividualSettingsDialog()
+        {
+            NewRobot5Ui ui = new NewRobot5Ui(this);
+            ui.ShowDialog();
+        }
+    }
+
+    /// <summary>
+    /// домашнее задание блока 4
+    /// робот на двух вкладках на два инструмента
+    /// Вход:
+    /// на одном инструменте молот направленный длинной тенью вниз,
+    /// на втором инструменте молот направленный длинной тенью вверх
+    /// на первом инструменте входим в лонг
+    /// на втором инструмент входим в шорт
+    /// использовать лимитные ордера
+    /// Выход:
+    /// через n свечей
+    /// </summary>
     public class HammerArbitrager : BotPanel
     {
         public HammerArbitrager(string name, StartProgram startProgram) : base(name, startProgram)
@@ -387,7 +537,6 @@ namespace OsEngine.OsTrader.Panels
             
         }
     }
-
     public class NewRobot4:BotPanel
     {
         public NewRobot4(string name, StartProgram startProgram) : base(name, startProgram)
