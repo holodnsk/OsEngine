@@ -28,7 +28,10 @@ namespace OsEngine.OsTrader.Panels
         {
             List<string> result = new List<string>();
 
-            result.Add("NewRobot7");
+            
+            result.Add("HomeWorkRobotBollingerAndMA");
+
+            result.Add("NewRobot7"); // прибыльный робот
 
             // публичные примеры
 
@@ -81,7 +84,12 @@ namespace OsEngine.OsTrader.Panels
 
             BotPanel bot = null;
 
-            if (nameClass == "NewRobot7")
+            if (nameClass == "HomeWorkRobotBollingerAndMA")
+            {
+                bot = new HomeWorkRobotBollingerAndMA(name, startProgram);
+            }
+
+            if (nameClass == "NewRobot7") // прибыльный робот
             {
                 bot = new NewRobot7(name, startProgram);
             }
@@ -238,6 +246,44 @@ namespace OsEngine.OsTrader.Panels
             
 
             return bot;
+        }
+    }
+
+    
+
+    
+    /// <summary>
+    /// ДЗ "Блок 6. Индикаторы (домашнее задание).mp4"
+    /// Создать робота на индикаторах
+    /// Bollinger
+    /// Moving Average
+    ///
+    /// Вход в лонг:
+    /// Свеча закрылась выше боллинжера
+    ///
+    /// Выход из лонга:
+    /// Свеча закрылась ниже МАшки
+    ///
+    /// Создать WPF
+    /// Сохранять
+    /// 1. объем для входа
+    /// 2. включен ли бот
+    /// 
+    /// </summary>
+    public class HomeWorkRobotBollingerAndMA : BotPanel
+    {
+        public HomeWorkRobotBollingerAndMA(string name, StartProgram startProgram) : base(name, startProgram)
+        {
+        }
+
+        public override string GetNameStrategyType()
+        {
+            return "HomeWorkRobotBollingerAndMA";
+        }
+
+        public override void ShowIndividualSettingsDialog()
+        {
+            
         }
     }
 
