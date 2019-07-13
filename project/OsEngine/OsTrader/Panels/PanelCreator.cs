@@ -261,7 +261,61 @@ namespace OsEngine.OsTrader.Panels
         }
     }
 
+    public class BotPartPortfolio : BotPanel
+    {
+        private MovingAverage _ma;
+        public BotPartPortfolio(string name, StartProgram startProgram) : base(name, startProgram)
+        {
+            TabCreate(BotTabType.Simple);
+            TabsSimple[0].CandleFinishedEvent += BotPartPortfolio_CandleFinishedEvent;
 
+            _ma = new MovingAverage("moving",false);
+            _ma = (MovingAverage) TabsSimple[0].CreateCandleIndicator(_ma, "Prime");
+            _ma.Save();
+        }
+
+        private void BotPartPortfolio_CandleFinishedEvent(List<Candle> candles)
+        {
+            if (_ma.Lenght + 2 > candles.Count)
+                return;
+
+            List<Position> openPositions = TabsSimple[0].PositionsOpenAll;
+
+            Candle lastCandle = candles[candles.Count - 1];
+            decimal lastMoving = _ma.Values[_ma.Values.Count - 1];
+
+            if (openPositions == null ||
+                openPositions.Count == 0)
+            {// открываем
+                
+                if (lastCandle.Close>lastMoving)
+                {// входим в лонг
+                    decimal f = 0.5m;
+                    decimal portfolioNow = TabsSimple[0].Portfolio.ValueCurrent;
+                    decimal lastPrice = lastCandle.Close;
+                    int volume = Convert.ToInt32(portfolioNow * f / lastPrice);
+                    TabsSimple[0].BuyAtMarket(volume);
+                }
+            }
+            else
+            {// закрываем
+                if (lastCandle.Close < lastMoving)
+                {
+                    TabsSimple[0].CloseAtLimit(openPositions[0], lastCandle.Close, openPositions[0].OpenVolume);
+                }
+            }
+        }
+
+        public override string GetNameStrategyType()
+        {
+            return "BotPartPortfolio";
+        }
+
+        public override void ShowIndividualSettingsDialog()
+        {
+            throw new NotImplementedException();
+        }
+    }
 
     /// <summary>
     /// доходный арбитражный робот
