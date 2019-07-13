@@ -14,6 +14,8 @@ using OsEngine.Charts.CandleChart.Indicators;
 using OsEngine.Entity;
 using OsEngine.Logging;
 using OsEngine.Market;
+using OsEngine.Market.Servers;
+using OsEngine.Market.Servers.BitStamp.BitStampEntity;
 using OsEngine.OsTrader.Panels.PanelsGui;
 using OsEngine.OsTrader.Panels.SingleRobots;
 using OsEngine.OsTrader.Panels.Tab;
@@ -29,6 +31,7 @@ namespace OsEngine.OsTrader.Panels
             List<string> result = new List<string>();
 
             
+            result.Add("BotHFTStyle");
             result.Add("HomeWorkRobotBollingerAndMA");
 
             result.Add("NewRobot7"); // прибыльный робот
@@ -84,6 +87,10 @@ namespace OsEngine.OsTrader.Panels
 
             BotPanel bot = null;
 
+            if (nameClass == "BotHFTStyle")
+            {
+                bot = new BotHFTStyle(name, startProgram);
+            }
             if (nameClass == "HomeWorkRobotBollingerAndMA")
             {
                 bot = new HomeWorkRobotBollingerAndMA(name, startProgram);
@@ -249,9 +256,204 @@ namespace OsEngine.OsTrader.Panels
         }
     }
 
-    
 
-    
+
+
+    public class BotHFTStyle:BotPanel
+    {
+        public BotHFTStyle(string name, StartProgram startProgram) : base(name, startProgram)
+        {
+            ServerMaster.ServerCreateEvent += ServerMaster_ServerCreateEvent;
+        }
+
+        public override string GetNameStrategyType()
+        {
+            return "BotHFTStyle";
+        }
+
+        public override void ShowIndividualSettingsDialog()
+        {
+
+        }
+
+        private IServer server;
+
+        private void ServerMaster_ServerCreateEvent(Market.Servers.IServer obj)
+        {
+            server = ServerMaster.GetServers()[0];
+            server.NewTradeEvent += Server_NewTradeEvent;
+            server.NewMarketDepthEvent += Server_NewMarketDepthEvent;
+
+            server.NewOrderIncomeEvent += Server_NewOrderIncomeEvent;
+        }
+
+
+
+        private void Server_NewMarketDepthEvent(MarketDepth marketDepth)
+        {
+            if (_depths == null)
+            {
+                _depths = new List<MarketDepth>();
+            }
+
+            for (int i = 0; i < _depths.Count; i++)
+            {
+                if (_depths[i].SecurityNameCode == marketDepth.SecurityNameCode) // если такой стакан есть то обновляем его
+                {
+                    _depths[i] = marketDepth;
+                    return;
+                }
+            }
+
+            // если такого стакана не оказалось то добавляем
+            _depths.Add(marketDepth);
+        }
+
+        private List<MarketDepth> _depths; // здесь всегда будут свежие стаканы которые идут из сервера
+
+        private void Server_NewTradeEvent(List<Trade> trades)
+        {
+            // если в секунде прошло более покупок
+            // и если в стакане суммарный объем в прожэе в два раза меньше чем суммарный объем в покупках
+            // входим в лонг
+
+
+            if (trades.Count < 20)
+            {
+                return;
+            }
+
+            MarketDepth myMarketDepth = null;
+            for (int i = 0; _depths != null && i < _depths.Count; i++) 
+            {
+                if (_depths[i].SecurityNameCode == trades[trades.Count - 1].SecurityNameCode)
+                {
+                    myMarketDepth = _depths[i];
+                    break;
+                }
+            }
+
+            if (myMarketDepth == null)
+            {
+                return;
+            }
+
+
+
+            if (weOpenPosition = false)
+            {// логика открытия позиции
+                
+                int countBuyTrades = 0;
+                for (int i = trades.Count - 1; i > 0; i++)
+                {
+                    if (trades[i].Side == Side.Buy && trades[i].Time == trades[trades.Count - 1].Time) // епсли по времени последнего трейда прошло более 20
+                    {
+                        countBuyTrades++;
+                    }
+
+                    if (trades[i].Time != trades[trades.Count -1].Time) // будем ходить по циклу пока секунда не закончится
+                    {
+                        break;
+                    }
+                }
+
+                if (countBuyTrades > 20 && myMarketDepth.AskSummVolume * 0.3m/*в бой надо 2*/ > myMarketDepth.BidSummVolume)
+                {// если трейдов в секунду более 20 и в стакане суммарный объем в продажах в 2 раза меньше чем суммарный объем покупок
+                    // покупаем
+                    weOpenPosition = true;
+                    CreateNewOrder(1, myMarketDepth.Asks[0].Price, trades[trades.Count - 1].SecurityNameCode, Side.Buy); // возьмем лучшую цену из стакана
+                }
+            }
+            else if (weOpenPosition== true)
+            {// логика закрытия позиции
+                // 1 если орлер еа открытие висит в Квик и не исполняется, надо будет отозвать по вреемни
+                if (orderIsExecute == false &&
+                    orderOnBoard!=null)
+                {
+                    if (orderOnBoard.TimeCreate/*время компа*/.AddSeconds(60)< DateTime.Now) // можно использовать TimeCallBack время выставления ордера на биржу во времени биржи
+                    {// отзыв ордера если с момента открытия прошло более 60 секунд и так и не открылось
+                        weOpenPosition = false;
+                        orderIsExecute = false;
+                        server.CanselOrder(orderOnBoard);
+                        orderOnBoard = null;
+                    }
+                }
+
+                // 2 если позиция полностью открыта
+                if (orderIsExecute==true)
+                {
+                    if (orderOnBoard.TimeCreate.AddSeconds(200) < DateTime.Now)
+                    {
+                        // закрытие позиции. Выставляем заявку на продажу контракта
+                        Security security = server.GetSecurityForName(trades[trades.Count - 1].SecurityNameCode);
+
+
+                        CreateNewOrder(
+                            1, 
+                            myMarketDepth.Bids[0].Price - 20*security.PriceStep, 
+                            trades[trades.Count - 1].SecurityNameCode, 
+                            Side.Sell
+                            );
+                        weOpenPosition = false;
+                        orderIsExecute = false;
+                        orderOnBoard = null;
+                    }
+                }
+            }
+           
+        } 
+
+        // логика входа в позицию
+
+
+        /// <summary>
+        /// создаем ордер и высылаем в сервер
+        /// </summary>
+        public void CreateNewOrder(int volume, decimal price, string securityNameCode, Side side)
+        {
+            Order order = new Order();
+            order.Volume = volume;
+            order.Price = price;
+            order.Side = Side.Buy;
+            order.SecurityNameCode = securityNameCode;
+
+            // если торговать фьючерсы через квик, то следует вписать значение столбца "торговый счет" из таблицы "фьючерсы и опционы"->"позиции по клиентским счетам"
+            // если торговать спот через квик, то следует склеить через собаку "счет_депо@код_клиента" из таблицы "счета и позиции"->"позиции по инструментам" и из таблицы "клиентских портфель"
+            order.PortfolioNumber = "7640ker";
+            order.NumberUser = NumberGen.GetNumberOrder(StartProgram);
+            server.ExecuteOrder(order);
+        }
+
+        private bool weOpenPosition;
+        private bool orderIsExecute;
+        private Order orderOnBoard;
+        private void Server_NewOrderIncomeEvent(Order order)
+        {
+            if (weOpenPosition = false)
+            {
+                return;
+            }
+
+            if (order.State == OrderStateType.Activ /*возможно надо указать статус None*/)
+            {
+                orderOnBoard = order;
+            }
+
+            if (order.State==OrderStateType.Fail)
+            {
+                weOpenPosition = false;
+                orderIsExecute = false;
+                orderOnBoard = null;
+            }
+
+            if (order.State==OrderStateType.Activ)
+            {
+                orderOnBoard = order;
+            }
+        }
+
+
+    }
     /// <summary>
     /// ДЗ "Блок 6. Индикаторы (домашнее задание).mp4"
     /// Создать робота на индикаторах
