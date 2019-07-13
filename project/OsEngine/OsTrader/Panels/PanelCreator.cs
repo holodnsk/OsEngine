@@ -31,6 +31,7 @@ namespace OsEngine.OsTrader.Panels
             List<string> result = new List<string>();
 
             
+            result.Add("BotArbitrage");
             result.Add("BotHFTStyle");
             result.Add("HomeWorkRobotBollingerAndMA");
 
@@ -87,6 +88,10 @@ namespace OsEngine.OsTrader.Panels
 
             BotPanel bot = null;
 
+            if (nameClass == "BotArbitrage")
+            {
+                bot = new BotArbitrage(name, startProgram);
+            }
             if (nameClass == "BotHFTStyle")
             {
                 bot = new BotHFTStyle(name, startProgram);
@@ -258,7 +263,118 @@ namespace OsEngine.OsTrader.Panels
 
 
 
+    /// <summary>
+    /// доходный арбитражный робот
+    /// для тестов надо минутные свечи rts ri и si склееный фьючерс финама за пол года
+    /// для индекса в нулевую вкладку ri (rts) и si
+    /// индекс должен состоять из свечей одного таймфрейма
+    /// формула : A0*2-A1  (две части ri и  от этого отнята одна часть si)
+    /// для вкладки торговли выьрать Si
+    /// Найстройка индикаторов
+    /// Ivashov Range - длинна скользящей 500, длинна сглаживания 200
+    /// Moving Average - Длинна индикатора 200 (или 100), поле цены close
+    /// </summary>
+    public class BotArbitrage : BotPanel
+    {
+        private IvashovRange _range;
+        private MovingAverage _ma;
+        public BotArbitrage(string name, StartProgram startProgram) : base(name, startProgram)
+        {
+            TabCreate(BotTabType.Index);
 
+            _range = new IvashovRange("_range",false);// один из видов подсчета среднеквадратичного отклонения от средней, авторский индикатор одного из сленов команды O-S-A
+            _range = (IvashovRange) TabsIndex[0].CreateCandleIndicator(_range, "RangeArea"); // не надо на главной области, будет на отдельной
+            _range.Save();
+
+            _ma = new MovingAverage("moving",false);
+            _ma = (MovingAverage) TabsIndex[0].CreateCandleIndicator(_ma, "Prime");
+            _ma.Save();
+
+            TabCreate(BotTabType.Simple); // арбитраж одноногий, который будет смотреть на наш индек из нескольких инстурментов, а торговать будем одним инструментом
+            TabsSimple[0].CandleFinishedEvent += BotArbitrage_CandleFinishedEvent;
+            TabsIndex[0].SpreadChangeEvent += BotArbitrage_SpreadChangeEvent;
+        }
+
+        private void BotArbitrage_SpreadChangeEvent(List<Candle> candlesIndex)
+        {
+            List<Candle> candlesTab = TabsSimple[0].CandlesFinishedOnly;
+
+            if (candlesIndex[candlesIndex.Count - 1].TimeStart == candlesTab[candlesTab.Count - 1].TimeStart) // если свечи засинканы
+            {
+                TradeLogic(candlesIndex, candlesTab);
+            }
+
+        }
+
+        private void BotArbitrage_CandleFinishedEvent(List<Candle> candlesTab)
+        {
+
+            List<Candle> candlesIndex = TabsIndex[0].Candles;
+
+            if (candlesIndex[candlesIndex.Count - 1].TimeStart == candlesTab[candlesTab.Count - 1].TimeStart) // если свечи засинканы
+            {
+                TradeLogic(candlesIndex, candlesTab);
+            }
+
+        }
+
+        public void TradeLogic(List<Candle> index, List<Candle> tabCandles)
+        {
+            if (_range.LenghtAverage > tabCandles.Count+5 || 
+                _range.LenghtMa > tabCandles.Count+5 ||
+                _ma.Lenght > tabCandles.Count+5)
+            {
+                return;
+            }
+
+            List<Position> positions = TabsSimple[0].PositionsOpenAll;
+            if (positions == null || positions.Count == 0)
+            {
+                // открытие позиции
+                if (index[index.Count-1].Close > 
+                    _ma.Values[_ma.Values.Count-1] + _range.Values[_range.Values.Count-1]) // если закрытие свечи в индексе больше чем текущее значение машки + текущее значение IvashovRange
+                {// шорт. Находимся выше канала среднеквадратичного отклонения
+                    TabsSimple[0].SellAtLimit(1, tabCandles[tabCandles.Count - 1].Close);
+                }
+                else if (index[index.Count - 1].Close <
+                         _ma.Values[_ma.Values.Count - 1] - _range.Values[_range.Values.Count - 1]) // если закрытие свечи в индексе меньше чем текущее значение машки - текущее значение IvashovRange
+                {// лонг. Находимся ниже канала среднеквадратичного отклонения
+                    TabsSimple[0].BuyAtLimit(1, tabCandles[tabCandles.Count - 1].Close);
+                }
+            }
+            else
+            {
+                if (positions[0].State != PositionStateType.Open)
+                    return;
+
+                // закрытиые позиции
+                if (positions[0].Direction== Side.Buy && 
+                    index[index.Count - 1].Close >
+                    _ma.Values[_ma.Values.Count - 1] + _range.Values[_range.Values.Count - 1]) // если закрытие свечи в индексе больше чем текущее значение машки + текущее значение IvashovRange
+                {// шорт. Находимся выше канала среднеквадратичного отклонения
+                    TabsSimple[0].CloseAtLimit(positions[0],tabCandles[tabCandles.Count - 1].Close,positions[0].OpenVolume);
+                }
+                else if (positions[0].Direction == Side.Sell &&  
+                         index[index.Count - 1].Close <
+                         _ma.Values[_ma.Values.Count - 1] - _range.Values[_range.Values.Count - 1]) // если закрытие свечи в индексе меньше чем текущее значение машки - текущее значение IvashovRange
+                {// лонг. Находимся ниже канала среднеквадратичного отклонения
+                    TabsSimple[0].CloseAtLimit(positions[0], tabCandles[tabCandles.Count - 1].Close, positions[0].OpenVolume);
+                }
+            }
+        }
+
+
+
+        public override string GetNameStrategyType()
+        {
+            return "BotArbitrage";
+        }
+
+        public override void ShowIndividualSettingsDialog()
+        {
+            
+        }
+    }
     public class BotHFTStyle:BotPanel
     {
         public BotHFTStyle(string name, StartProgram startProgram) : base(name, startProgram)
